@@ -12,7 +12,7 @@ from imgaug import augmenters as iaa
 
 
 
-def homographic_aug_pipline(img, pts, config, device='cpu'):
+def homographic_aug_pipline(img, pts, config, device='cpu', id_included=False):
     """
     :param img: [1,1,H,W]
     :param pts:[N,2]
@@ -30,9 +30,10 @@ def homographic_aug_pipline(img, pts, config, device='cpu'):
 
     warped_valid_mask = compute_valid_mask(image_shape, homography, config['valid_border_margin'], device=device)
 
-    warped_points = warp_points(pts, homography, device=device)
-    warped_points = filter_points(warped_points, image_shape, device=device)
-    warped_points_map = compute_keypoint_map(warped_points, img.shape[2:], device=device)
+    warped_points = warp_points(pts, homography, device=device, id_included=id_included)
+    warped_points = filter_points(warped_points, image_shape, device=device, id_included=id_included)
+
+    warped_points_map = compute_keypoint_map(warped_points, img.shape[2:], device=device, id_included=id_included)
 
     return {'warp':{'img': warped_image.squeeze(),
                     'kpts': warped_points,
