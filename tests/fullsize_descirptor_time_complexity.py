@@ -41,9 +41,9 @@ a1 = torch.rand([8,256,30,40]).cuda()
 b1=torch.from_numpy(np.random.choice(2,2457600)).reshape(8,256,30,40).cuda()
 c1 = a1*b1
 c1 = F.normalize(c1,p=2,dim=1)
-d1 = c
+d1 = c1.to_sparse()
 
-torch.sparse.mm(c1,d)
+# torch.sparse.mm(c1,d)
 
 result = torch.matmul(d,d1)
 # print(result.is_sparse)
