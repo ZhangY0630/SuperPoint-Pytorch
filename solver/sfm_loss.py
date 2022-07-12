@@ -54,7 +54,8 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
         loss = lambda_d * s * positive_dist + (1 - s) * negative_dist
 
         loss = lambda_loss*torch.sum(valid_mask * loss)/normalization
-        return loss
+        total_loss = total_loss+loss
+    return total_loss
 
 
 # Reason to discard this:
