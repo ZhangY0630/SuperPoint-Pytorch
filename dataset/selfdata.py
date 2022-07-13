@@ -17,9 +17,7 @@ class SelfDataset(torch.utils.data.Dataset):
         self.is_train = is_train
         self.resize = tuple(config['resize'])
         self.photo_augmentor = PhotoAugmentor(config['augmentation']['photometric'])
-        # load config
         self.config = config
-        # get images
         if self.is_train:
             self.samples = self._init_data(config['image_train_path'], config['label_train_path'], config['pairs_train_path'])
         else:
@@ -77,10 +75,10 @@ class SelfDataset(torch.utils.data.Dataset):
 
         pts = None if data_path['label'] is None else np.load(data_path['label'])[:, [1,0,2]]
         pts1 = None if data_path['label1'] is None else np.load(data_path['label1'])[:, [1,0,2]]
-        pts[:, 0] = pts[:, 0]/1280*self.resize[0]
-        pts[:, 1] = pts[:, 1]/1920*self.resize[1]
-        pts1[:, 0] = pts1[:, 0]/1280*self.resize[0]
-        pts1[:, 1] = pts1[:, 1]/1920*self.resize[1]
+        pts[:, 0] = (pts[:, 0]+0.5)/1280*self.resize[0]
+        pts[:, 1] = (pts[:, 1]+0.5)/1920*self.resize[1]
+        pts1[:, 0] = (pts1[:, 0]+0.5)/1280*self.resize[0]
+        pts1[:, 1] = (pts1[:, 1]+0.5)/1920*self.resize[1]
         
         kpts_tensor = None if pts is None else torch.as_tensor(pts, device=self.device)
         kpts_tensor1 = None if pts1 is None else torch.as_tensor(pts1, device=self.device)
