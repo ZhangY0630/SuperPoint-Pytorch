@@ -36,7 +36,8 @@ class SelfDataset(torch.utils.data.Dataset):
         for im_path, lb_path, pair_path in zip(image_paths, label_paths, pair_paths):
             pairs = np.load(os.path.join(pair_path, 'pairs.npy'), allow_pickle=True)
             pairs = pairs.item()
-            for key in pairs:
+            templist = ['1377155868.png']
+            for key in templist:
                 filename = key.split(".")[0]
                 temp_im = os.path.join(im_path, key)
                 if lb_path is not None:
@@ -66,6 +67,8 @@ class SelfDataset(torch.utils.data.Dataset):
         data_path = self.samples[idx]
         
          # load images
+        print(data_path['image'])
+        print(data_path['image1'])
         img = cv2.imread(data_path['image'], 0)#Gray image
         img = cv2.resize(img, self.resize[::-1])
         img_tensor = torch.as_tensor(img.copy(), dtype=torch.float, device=self.device)
@@ -75,9 +78,9 @@ class SelfDataset(torch.utils.data.Dataset):
 
         pts = None if data_path['label'] is None else np.load(data_path['label'])[:, [1,0,2]]
         pts1 = None if data_path['label1'] is None else np.load(data_path['label1'])[:, [1,0,2]]
-        pts[:, 0] = (pts[:, 0]+0.5)/1280*self.resize[0]
+        pts[:, 0] = (pts[:, 0]+0.5)/1200*self.resize[0]
         pts[:, 1] = (pts[:, 1]+0.5)/1920*self.resize[1]
-        pts1[:, 0] = (pts1[:, 0]+0.5)/1280*self.resize[0]
+        pts1[:, 0] = (pts1[:, 0]+0.5)/1200*self.resize[0]
         pts1[:, 1] = (pts1[:, 1]+0.5)/1920*self.resize[1]
         
         kpts_tensor = None if pts is None else torch.as_tensor(pts, device=self.device)
@@ -88,9 +91,7 @@ class SelfDataset(torch.utils.data.Dataset):
         kpts_map1 = None if pts1 is None else compute_keypoint_map(kpts_tensor1, img1.shape, device=self.device, id_included=True)
         valid_mask = torch.ones(img.shape, device=self.device)
         valid_mask1 = torch.ones(img1.shape, device=self.device)
-        pairs = torch.as_tensor(np.array(data_path['covisibility']).astype(np.float32), device=self.device)
-        index = torch.as_tensor(np.array(data_path['index']).astype(np.float32), device=self.device)
-
+        
 
         data = {    'image':{'raw':{'img': img_tensor,
                                     'kpts': kpts_tensor,
@@ -110,10 +111,11 @@ class SelfDataset(torch.utils.data.Dataset):
                                     'kpts_map':None,
                                     'mask': None},
                             'homo': torch.eye(3,device=self.device)}, 
-                    'index': index,
-                    'pairs': pairs      
+                    'index': None,
+                    'pairs': None      
                 }
         
+        # compute warpings
         data['image']['warp'] = deepcopy(data['image']['raw'])
         data['image1']['warp'] = deepcopy(data['image1']['raw'])
         
@@ -143,14 +145,36 @@ class SelfDataset(torch.utils.data.Dataset):
             photo_img1 = data['image1']['warp']['img'].cpu().numpy().round().astype(np.uint8)
             photo_img1 = self.photo_augmentor(photo_img1)
             data['image1']['warp']['img'] = torch.as_tensor(photo_img1, dtype=torch.float,device=self.device)
-      
-        # normalize
-        data['image']['raw']['img'] = data['image']['raw']['img']/255.
-        data['image']['warp']['img'] = data['image']['warp']['img']/255.
-        data['image1']['raw']['img'] = data['image1']['raw']['img']/255.
-        data['image1']['warp']['img'] = data['image1']['warp']['img']/255.
         
-        print(data['image']['raw']['kpts_map'])
+        # compute new pairs and index
+        pairs_dict = dict.fromkeys(data_path['covisibility'], -1)
+        index_dict = dict.fromkeys(data_path['index'], -1)
+        pairs_list = data_path['covisibility']
+        index_list = data_path['index']
+        pairs = []
+        index = []
+        
+        for i, x in enumerate(data['image']['warp']['kpts']):
+            if int(x[2]) in index_dict:
+                index_dict[int(x[2])] = i
+        for i, x in enumerate(data['image1']['warp']['kpts']):
+            if int(x[2]) in pairs_dict:
+                pairs_dict[int(x[2])] = i
+        
+        for i in range(len(pairs_list)):
+            if pairs_dict[pairs_list[i]] != -1 and index_dict[index_list[i]] != -1:
+                pairs.append(pairs_dict[pairs_list[i]])
+                index.append(index_dict[index_list[i]])
+        
+        data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.float32), device=self.device)
+        data['index'] = torch.as_tensor(np.array(index).astype(np.float32), device=self.device)
+        
+        # remove the old index from points & normalize images
+        for image_flag in ['image','image1']:
+            for warp_flag in ['raw','warp']:
+                data[image_flag][warp_flag]['kpts'] = data[image_flag][warp_flag]['kpts'][:,:2]
+                data[image_flag][warp_flag]['img'] = data[image_flag][warp_flag]['img']/255.
+        
         return data
     
 
@@ -206,16 +230,52 @@ if __name__=='__main__':
     import yaml
     import matplotlib.pyplot as plt
     from dataset.utils.photometric_augmentation import *
-    with open('/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/config/superpoint_train.yaml','r') as fin:
+    with open('/Users/zhouchang/Documents/GitHub/SuperPoint-Pytorch/config/superpoint_train.yaml','r') as fin:
         config = yaml.safe_load(fin)
 
     selfdata = SelfDataset(config['data'],True)
     cdataloader = DataLoader(selfdata,collate_fn=selfdata.batch_collator,batch_size=1,shuffle=True)
 
     for i,d in enumerate(cdataloader):
-        print(i,d)
         if i>=5:
             break
+#         print(i,d)
+#         img = (d['image']['raw']['img']*255).cpu().numpy().squeeze().astype(np.int).astype(np.uint8)
+#         img = cv2.merge([img, img, img])
+#         img_warp = (d['image']['warp']['img']*255).cpu().numpy().squeeze().astype(np.int).astype(np.uint8)
+#         img_warp = cv2.merge([img_warp, img_warp, img_warp])
+#         img1 = (d['image1']['raw']['img']*255).cpu().numpy().squeeze().astype(np.int).astype(np.uint8)
+#         img1 = cv2.merge([img1, img1, img1])
+#         img_warp1 = (d['image1']['warp']['img']*255).cpu().numpy().squeeze().astype(np.int).astype(np.uint8)
+#         img_warp1 = cv2.merge([img_warp1, img_warp1, img_warp1])
+#         kpts = np.where(d['image']['raw']['kpts_map'].squeeze().cpu().numpy())
+#         kpts = np.vstack(kpts).T
+#         kpts = np.round(kpts).astype(np.int)
+#         for kp in kpts:
+#             cv2.circle(img, (kp[1], kp[0]), radius=1, color=(0,255,0))
+#         kpts = np.where(d['image']['warp']['kpts_map'].squeeze().cpu().numpy())
+#         kpts = np.vstack(kpts).T
+#         kpts = np.round(kpts).astype(np.int)
+#         for kp in kpts:
+#             cv2.circle(img_warp, (kp[1], kp[0]), radius=1, color=(0,255,0))
+#         kpts = np.where(d['image1']['raw']['kpts_map'].squeeze().cpu().numpy())
+#         kpts = np.vstack(kpts).T
+#         kpts = np.round(kpts).astype(np.int)
+#         for kp in kpts:
+#             cv2.circle(img1, (kp[1], kp[0]), radius=1, color=(0,255,0))
+#         kpts = np.where(d['image1']['warp']['kpts_map'].squeeze().cpu().numpy())
+#         kpts = np.vstack(kpts).T
+#         kpts = np.round(kpts).astype(np.int)
+#         for kp in kpts:
+#             cv2.circle(img_warp1, (kp[1], kp[0]), radius=1, color=(0,255,0))
+#         plt.imshow(img)
+#         plt.show()
+#         plt.imshow(img_warp)
+#         plt.show()
+#         plt.imshow(img1)
+#         plt.show()
+#         plt.imshow(img_warp1)
+#         plt.show()
         img = (d['image']['raw']['img']*255).cpu().numpy().squeeze().astype(np.int).astype(np.uint8)
         img_warp = (d['image']['warp']['img']*255).cpu().numpy().squeeze().astype(np.int).astype(np.uint8)
         img = cv2.merge([img, img, img])
@@ -224,14 +284,14 @@ if __name__=='__main__':
         kpts = np.vstack(kpts).T
         kpts = np.round(kpts).astype(np.int)
         for kp in kpts:
-            cv2.circle(img, (kp[1], kp[0]), radius=3, color=(0,255,0))
+            cv2.circle(img, (kp[1], kp[0]), radius=1, color=(0,255,0))
             
             
         kpts = np.where(d['image']['warp']['kpts_map'].squeeze().cpu().numpy())
         kpts = np.vstack(kpts).T
         kpts = np.round(kpts).astype(np.int)
         for kp in kpts:
-            cv2.circle(img_warp, (kp[1], kp[0]), radius=3, color=(0,255,0))
+            cv2.circle(img_warp, (kp[1], kp[0]), radius=1, color=(0,255,0))
 
         mask = d['image']['raw']['mask'].cpu().numpy().squeeze().astype(np.int).astype(np.uint8)*255
         warp_mask = d['image']['warp']['mask'].cpu().numpy().squeeze().astype(np.int).astype(np.uint8)*255
@@ -258,13 +318,13 @@ if __name__=='__main__':
         kpts = np.vstack(kpts).T
         kpts = np.round(kpts).astype(np.int)
         for kp in kpts:
-            cv2.circle(img, (kp[1], kp[0]), radius=3, color=(0,255,0))
+            cv2.circle(img, (kp[1], kp[0]), radius=1, color=(0,255,0))
             
         kpts = np.where(d['image1']['warp']['kpts_map'].squeeze().cpu().numpy())
         kpts = np.vstack(kpts).T
         kpts = np.round(kpts).astype(np.int)
         for kp in kpts:
-            cv2.circle(img_warp, (kp[1], kp[0]), radius=3, color=(0,255,0))
+            cv2.circle(img_warp, (kp[1], kp[0]), radius=1, color=(0,255,0))
 
         mask = d['image1']['raw']['mask'].cpu().numpy().squeeze().astype(np.int).astype(np.uint8)*255
         warp_mask = d['image1']['warp']['mask'].cpu().numpy().squeeze().astype(np.int).astype(np.uint8)*255

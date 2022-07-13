@@ -40,7 +40,7 @@ def compute_keypoint_map(points, shape, device='cpu', id_included = False):
 
 def warp_points(points, homographies, device='cpu', id_included = False):
     """
-    :param points: (N,2), tensor
+    :param points: (N,2), tensorgit
     :param homographies: [B, 3, 3], batch of homographies
     :return: warped points B,N,2
     """
