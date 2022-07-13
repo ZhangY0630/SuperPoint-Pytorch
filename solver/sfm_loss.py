@@ -2,10 +2,84 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-# from utils.keypoint_op import warp_points
-# from utils.tensor_op import pixel_shuffle_inv
+from utils.keypoint_op import warp_points
+from utils.tensor_op import pixel_shuffle_inv
+
+def loss_func(config,data,prob,desc=None,prob_pair=None,desc_pair=None,device='cpu',):
+        det_loss = detector_loss(data['image']['warp']['kpts_map'],
+                             prob['logits'],
+                             data['image']['warp']['mask'], 
+                             config['grid_size'],
+                             device=device)
+        if desc is None or prob_pair is None or desc_pair is None:
+            return det_loss 
+        
+        det_loss_warp = detector_loss(data['image1']['warp']['kpts_map'],
+                            prob_pair['logits'],
+                            data['image1']['warp']['mask'],
+                            config['grid_size'],
+                            device=device)
 
 
+        validmask = torch.stack((data['image']['warp']['mask'],data['image1']['warp']['mask']),dim=1)
+
+        pairs = []
+        for batch in range(len(data['index'])):
+            pairs.append( [pair for pair in zip(data['index'][batch],data['pair'][batch])])
+        
+        #descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask,device='cpu'):
+        weighted_des_loss = descriptor_loss(config,
+                            data['image']['warp']['kpts'],
+                            data['image']['warp']['kpts1'],
+                            desc['desc'],
+                            desc_pair['desc'],
+                            pairs,
+                            validmask,
+                            device)
+        loss = det_loss + det_loss_warp + weighted_des_loss
+
+        a, b, c = det_loss.item(), det_loss_warp.item(), weighted_des_loss.item()
+        print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b,c,a+b+c))
+        return loss
+
+
+def detector_loss(keypoint_map, logits, valid_mask=None, grid_size=8, device='cpu'):
+    """
+    :param keypoint_map: [B,H,W]
+    :param logits: [B,65,Hc,Wc]
+    :param valid_mask:[B, H, W]
+    :param grid_size: 8 default
+    :return:
+    """
+    # Convert the boolean labels to indices including the "no interest point" dustbin
+    labels = keypoint_map.unsqueeze(1).float()#to [B, 1, H, W]
+    labels = pixel_shuffle_inv(labels, grid_size) # to [B,64,H/8,W/8]
+    B,C,h,w = labels.shape#h=H/grid_size,w=W/grid_size
+    labels = torch.cat([2*labels, torch.ones([B,1,h,w],device=device)], dim=1)
+    # Add a small random matrix to randomly break ties in argmax
+    labels = torch.argmax(labels + torch.zeros(labels.shape,device=device).uniform_(0,0.1),dim=1)#B*65*Hc*Wc
+
+    # Mask the pixels if bordering artifacts appear
+    valid_mask = torch.ones_like(keypoint_map) if valid_mask is None else valid_mask
+    valid_mask = valid_mask.unsqueeze(1)
+    valid_mask = pixel_shuffle_inv(valid_mask, grid_size)#[B, 64, H/8, W/8]
+    valid_mask = torch.prod(valid_mask, dim=1).unsqueeze(dim=1).type(torch.float32)#[B,1,H/8,W/8]
+
+    ## method 1
+    ce_loss = F.cross_entropy(logits, labels, reduction='none',)
+    valid_mask = valid_mask.squeeze(dim=1)
+    loss = torch.divide(torch.sum(ce_loss * valid_mask, dim=(1, 2)), torch.sum(valid_mask + 1e-6, dim=(1, 2)))
+    loss = torch.mean(loss)
+
+    ## method 2
+    ## method 2 equals to tf.nn.sparse_softmax_cross_entropy()
+    # epsilon = 1e-6
+    # loss = F.log_softmax(logits,dim=1)
+    # mask = valid_mask.type(torch.float32)
+    # mask /= (torch.mean(mask)+epsilon)
+    # loss = torch.mul(loss, mask)
+    # loss = F.nll_loss(loss,labels)
+    return loss
 
 """
 :param image1_keypoints: [[1,2],[3,4],[9,9]..] Batch*[keypoints]
@@ -13,11 +87,12 @@ import torch.nn.functional as F
 """
 def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask,device='cpu'):
     """
-    :param image1_keypoints: [[1,2],[3,4],[9,9]..] Batch*[keypoints]
-    :param corresponding_keypoints: [[5,7],[3,2],[4,6]..]
-    :param: pair -> [[image_keypoint_index,image1_keypoint_index],[7,4],...] [N,2] : corresponding size
+    :param image1_keypoints: [[1,2],[3,4],[9,9]..] Batch*[keypoints] B,N,2
+    :param corresponding_keypoints: [[5,7],[3,2],[4,6]..] [B 256 H W]
+    :param: pair -> [[image_keypoint_index,image1_keypoint_index],[7,4],...] [N,2] : corresponding size [[7,4]]
     :param: mask ->[batch,2,H,W]
     """
+
 
     positive_margin = config['loss']['positive_margin']
     negative_margin = config['loss']['negative_margin']
@@ -57,7 +132,17 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
         total_loss = total_loss+loss
     return total_loss
 
+def precision_recall(pred, keypoint_map, valid_mask):
+    pred = valid_mask * pred
+    labels = keypoint_map
 
+    precision = torch.sum(pred*labels)/torch.sum(pred)
+    recall = torch.sum(pred*labels)/torch.sum(labels)
+
+    return {'precision': precision, 'recall': recall}
+
+
+# torch.bmm
 # Reason to discard this:
 # 1. can't find a way to generate sparse matrix as multiplication result
 # 1. don't have enough space to calculation
