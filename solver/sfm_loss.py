@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from utils.keypoint_op import warp_points
 from utils.tensor_op import pixel_shuffle_inv
 
-def loss_func(config,data,prob,desc=None,prob_pair=None,desc_pair=None,device='cpu',):
+def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,device='cpu',):
         det_loss = detector_loss(data['image']['warp']['kpts_map'],
                              prob['logits'],
                              data['image']['warp']['mask'], 
@@ -30,7 +30,7 @@ def loss_func(config,data,prob,desc=None,prob_pair=None,desc_pair=None,device='c
         #descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask,device='cpu'):
         weighted_des_loss = descriptor_loss(config,
                             data['image']['warp']['kpts'],
-                            data['image']['warp']['kpts1'],
+                            data['image1']['warp']['kpts'],
                             desc['desc'],
                             desc_pair['desc'],
                             pairs,
@@ -242,8 +242,8 @@ def descriptorCorrespondence_singleBatch(kptSize,kptSize1,pair):
     :param: kptSize1 -> int : image1 keypoints size
     :param: pair -> [[2,5],[7,4],...] [N,2] : corresponding size
     """
-   
-    corres = torch.sparse_coo_tensor(torch.tensor(pair).t(),[1]*len(pair),(kptSize,kptSize1))
+    corres = torch.sparse_coo_tensor(pair.t(),[1]*len(pair),(kptSize,kptSize1))
+    # corres = torch.sparse_coo_tensor(torch.tensor(pair).t(),[1]*len(pair),(kptSize,kptSize1))
     corres = corres.to_dense()
     return corres
 

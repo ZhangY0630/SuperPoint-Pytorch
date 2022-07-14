@@ -7,11 +7,13 @@ import yaml
 import argparse
 from tqdm import tqdm
 from dataset.coco import COCODataset
+from dataset.selfdata import SelfDataset
 from dataset.synthetic_shapes import SyntheticShapes
 from torch.utils.data import DataLoader
 from model.magic_point import MagicPoint
 from model.superpoint_bn import SuperPointBNNet
 from solver.loss import loss_func
+from solver.sfm_loss import loss_func_sfm
 
 #map magicleap weigt to our model
 model_dict_map= \
@@ -55,11 +57,20 @@ def train_eval(model, dataloader, config):
                     data['raw'] = data['warp']
                     data['warp'] = None
 
-                raw_outputs = model(data['raw'])
+                if config['data']['name']!='self':
+                    raw_outputs = model(data['raw'])
+                else:
+                    raw_outputs = model(data['image']['warp'])
 
                 ## for superpoint
-                if config['model']['name']!='magicpoint':#train superpoint
+                if config['model']['name']!='magicpoint' and config['data']['name']=='coco':#train superpoint
                     warp_outputs = model(data['warp'])
+                    prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
+                                                       raw_outputs['desc_info'], \
+                                                       warp_outputs['det_info'],\
+                                                       warp_outputs['desc_info']
+                elif config['model']['name']!='magicpoint' and config['data']['name']=='self':
+                    warp_outputs = model(data['image1']['warp'])
                     prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
                                                        raw_outputs['desc_info'], \
                                                        warp_outputs['det_info'],\
@@ -68,7 +79,11 @@ def train_eval(model, dataloader, config):
                     prob = raw_outputs #train magicpoint
 
                 ##loss
-                loss = loss_func(config['solver'], data, prob, desc,
+                if config['data']['name']!='self':
+                    loss = loss_func(config['solver'], data, prob, desc,
+                                 prob_warp, desc_warp, device)
+                else:
+                    loss = loss_func_sfm(config['solver'], data, prob, desc,
                                  prob_warp, desc_warp, device)
 
                 mean_loss.append(loss.item())
@@ -159,6 +174,13 @@ if __name__=='__main__':
     data_loaders = None
     if config['data']['name'] == 'coco':
         datasets = {k: COCODataset(config['data'], is_train=True if k == 'train' else False, device=device)
+                    for k in ['test', 'train']}
+        data_loaders = {k: DataLoader(datasets[k],
+                                      config['solver']['{}_batch_size'.format(k)],
+                                      collate_fn=datasets[k].batch_collator,
+                                      shuffle=True) for k in ['train', 'test']}
+    elif config['data']['name'] == 'self':
+        datasets = {k: SelfDataset(config['data'], is_train=True if k == 'train' else False, device=device)
                     for k in ['test', 'train']}
         data_loaders = {k: DataLoader(datasets[k],
                                       config['solver']['{}_batch_size'.format(k)],

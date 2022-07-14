@@ -3,10 +3,10 @@ data:
     resize: [240,320]
     image_train_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self/images'
     label_train_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self/keypoints'
-    image_test_path: './data/coco/images/test2017/'
-    label_test_path: './data/coco/labels/test2017/'
+    image_test_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self/images'
+    label_test_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self/keypoints'
     pairs_train_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self'
-    pairs_test_path:
+    pairs_test_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self'
     augmentation:
         photometric:
             train_enable: true
@@ -63,9 +63,9 @@ solver:
         negative_margin: 0.2
         lambda_d: 0.05
         lambda_loss: 10000
-    epoch: 8
-    base_lr: 0.001 #0.0001
+    epoch: 2
+    base_lr: 0.01 #0.0001
     train_batch_size: 2
     test_batch_size: 2
     save_dir: './export/'
-    model_name: 'sp'
+    model_name: 'test'

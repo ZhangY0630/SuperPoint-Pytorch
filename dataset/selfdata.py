@@ -181,48 +181,48 @@ class SelfDataset(torch.utils.data.Dataset):
         img:H*W, kpts:N*2, kpts_map:HW, valid_mask:HW, homography:HW
         :return:
         """
-#         sub_data={  'raw':{ 'img':      [],
-#                             'kpts':     [],
-#                             'kpts_map': [],
-#                             'mask':     []},
-#                     'warp':{'img':      [],
-#                             'kpts':     [],
-#                             'kpts_map': [],
-#                             'mask':     []},
-#                     'homo':             []}
         sub_data={  'raw':{ 'img':      [],
                             'kpts':     [],
-                            'kpts_map': []},
+                            'kpts_map': [],
+                            'mask':     []},
                     'warp':{'img':      [],
                             'kpts':     [],
-                            'kpts_map': []}}
-        batch = {'image':deepcopy(sub_data), 'image1':deepcopy(sub_data), 'masks': [], 'pairs': []}
+                            'kpts_map': [],
+                            'mask':     []},
+                    'homo':             []}
+        # sub_data={  'raw':{ 'img':      [],
+        #                     'kpts':     [],
+        #                     'kpts_map': []},
+        #             'warp':{'img':      [],
+        #                     'kpts':     [],
+        #                     'kpts_map': []}}
+        batch = {'image':deepcopy(sub_data), 'image1':deepcopy(sub_data), 'pairs': []}
         for s in samples:
             batch['pairs'].append(s['pairs'])
             batch['image']['raw']['img'].append(s['image']['raw']['img'].unsqueeze(dim=0))
             batch['image']['raw']['kpts'].append(s['image']['raw']['kpts'])
             batch['image']['raw']['kpts_map'].append(s['image']['raw']['kpts_map'])
-#             batch['image']['raw']['mask'].append(s['image']['raw']['mask'])
+            batch['image']['raw']['mask'].append(s['image']['raw']['mask'])
             batch['image']['warp']['img'].append(s['image']['warp']['img'].unsqueeze(dim=0))
             batch['image']['warp']['kpts'].append(s['image']['warp']['kpts'])
             batch['image']['warp']['kpts_map'].append(s['image']['warp']['kpts_map'])
-#             batch['image']['warp']['mask'].append(s['image']['warp']['mask'])
+            batch['image']['warp']['mask'].append(s['image']['warp']['mask'])
 #             batch['image']['homo'].append(s['image']['homo'])
             batch['image1']['raw']['img'].append(s['image1']['raw']['img'].unsqueeze(dim=0))
             batch['image1']['raw']['kpts'].append(s['image1']['raw']['kpts'])
             batch['image1']['raw']['kpts_map'].append(s['image1']['raw']['kpts_map'])
-#             batch['image1']['raw']['mask'].append(s['image1']['raw']['mask'])
+            batch['image1']['raw']['mask'].append(s['image1']['raw']['mask'])
             batch['image1']['warp']['img'].append(s['image1']['warp']['img'].unsqueeze(dim=0))
             batch['image1']['warp']['kpts'].append(s['image1']['warp']['kpts'])
             batch['image1']['warp']['kpts_map'].append(s['image1']['warp']['kpts_map'])
-            batch['masks'].append(torch.stack((s['image']['warp']['mask'], s['image']['warp']['mask']), dim=0))
-#             batch['image1']['warp']['mask'].append(s['image1']['warp']['mask'])
+            # batch['masks'].append(torch.stack((s['image']['warp']['mask'], s['image']['warp']['mask']), dim=0))
+            batch['image1']['warp']['mask'].append(s['image1']['warp']['mask'])
 #             batch['image1']['homo'].append(s['image1']['homo'])
-        batch['masks'] = torch.stack(batch['masks'])
+        # batch['masks'] = torch.stack(batch['masks'])
         for k0 in ('image','image1'):
 #             batch[k0]['homo'] = torch.stack(batch[k0]['homo'])
             for k1 in ('raw','warp'):
-                for k2 in ('img', 'kpts_map'):
+                for k2 in ('img', 'kpts_map', 'mask'):
                     batch[k0][k1][k2] = torch.stack(batch[k0][k1][k2])
         return batch
     
