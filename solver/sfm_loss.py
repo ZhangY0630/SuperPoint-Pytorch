@@ -22,9 +22,10 @@ def loss_func(config,data,prob,desc=None,prob_pair=None,desc_pair=None,device='c
 
         validmask = torch.stack((data['image']['warp']['mask'],data['image1']['warp']['mask']),dim=1)
 
-        pairs = []
-        for batch in range(len(data['index'])):
-            pairs.append( [pair for pair in zip(data['index'][batch],data['pair'][batch])])
+        # pairs = []
+        # for batch in range(len(data['index'])):
+        #     pairs.append( [pair for pair in zip(data['index'][batch],data['pair'][batch])])
+        pairs = data['pairs']
         
         #descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask,device='cpu'):
         weighted_des_loss = descriptor_loss(config,
