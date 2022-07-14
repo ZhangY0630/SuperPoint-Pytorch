@@ -67,8 +67,6 @@ class SelfDataset(torch.utils.data.Dataset):
         data_path = self.samples[idx]
         
          # load images
-        print(data_path['image'])
-        print(data_path['image1'])
         img = cv2.imread(data_path['image'], 0)#Gray image
         img = cv2.resize(img, self.resize[::-1])
         img_tensor = torch.as_tensor(img.copy(), dtype=torch.float, device=self.device)
@@ -111,7 +109,6 @@ class SelfDataset(torch.utils.data.Dataset):
                                     'kpts_map':None,
                                     'mask': None},
                             'homo': torch.eye(3,device=self.device)}, 
-                    'index': None,
                     'pairs': None      
                 }
         
@@ -163,16 +160,14 @@ class SelfDataset(torch.utils.data.Dataset):
         
         for i in range(len(pairs_list)):
             if pairs_dict[pairs_list[i]] != -1 and index_dict[index_list[i]] != -1:
-                pairs.append(pairs_dict[pairs_list[i]])
-                index.append(index_dict[index_list[i]])
+                pairs.append([index_dict[index_list[i]], pairs_dict[pairs_list[i]]])
         
-        data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.float32), device=self.device)
-        data['index'] = torch.as_tensor(np.array(index).astype(np.float32), device=self.device)
+        data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.int), device=self.device)
         
         # remove the old index from points & normalize images
         for image_flag in ['image','image1']:
             for warp_flag in ['raw','warp']:
-                data[image_flag][warp_flag]['kpts'] = data[image_flag][warp_flag]['kpts'][:,:2]
+                data[image_flag][warp_flag]['kpts'] = data[image_flag][warp_flag]['kpts'][:,:2].int()
                 data[image_flag][warp_flag]['img'] = data[image_flag][warp_flag]['img']/255.
         
         return data
@@ -186,43 +181,48 @@ class SelfDataset(torch.utils.data.Dataset):
         img:H*W, kpts:N*2, kpts_map:HW, valid_mask:HW, homography:HW
         :return:
         """
+#         sub_data={  'raw':{ 'img':      [],
+#                             'kpts':     [],
+#                             'kpts_map': [],
+#                             'mask':     []},
+#                     'warp':{'img':      [],
+#                             'kpts':     [],
+#                             'kpts_map': [],
+#                             'mask':     []},
+#                     'homo':             []}
         sub_data={  'raw':{ 'img':      [],
                             'kpts':     [],
-                            'kpts_map': [],
-                            'mask':     []},
+                            'kpts_map': []},
                     'warp':{'img':      [],
                             'kpts':     [],
-                            'kpts_map': [],
-                            'mask':     []},
-                    'homo':             []}
-        batch = {'image':deepcopy(sub_data), 'image1':deepcopy(sub_data), 'index': [], 'pairs': []}
+                            'kpts_map': []}}
+        batch = {'image':deepcopy(sub_data), 'image1':deepcopy(sub_data), 'masks': [], 'pairs': []}
         for s in samples:
-            batch['index'].append(s['index'])
             batch['pairs'].append(s['pairs'])
             batch['image']['raw']['img'].append(s['image']['raw']['img'].unsqueeze(dim=0))
             batch['image']['raw']['kpts'].append(s['image']['raw']['kpts'])
             batch['image']['raw']['kpts_map'].append(s['image']['raw']['kpts_map'])
-            batch['image']['raw']['mask'].append(s['image']['raw']['mask'])
+#             batch['image']['raw']['mask'].append(s['image']['raw']['mask'])
             batch['image']['warp']['img'].append(s['image']['warp']['img'].unsqueeze(dim=0))
             batch['image']['warp']['kpts'].append(s['image']['warp']['kpts'])
             batch['image']['warp']['kpts_map'].append(s['image']['warp']['kpts_map'])
-            batch['image']['warp']['mask'].append(s['image']['warp']['mask'])
-            batch['image']['homo'].append(s['image']['homo'])
+#             batch['image']['warp']['mask'].append(s['image']['warp']['mask'])
+#             batch['image']['homo'].append(s['image']['homo'])
             batch['image1']['raw']['img'].append(s['image1']['raw']['img'].unsqueeze(dim=0))
             batch['image1']['raw']['kpts'].append(s['image1']['raw']['kpts'])
             batch['image1']['raw']['kpts_map'].append(s['image1']['raw']['kpts_map'])
-            batch['image1']['raw']['mask'].append(s['image1']['raw']['mask'])
+#             batch['image1']['raw']['mask'].append(s['image1']['raw']['mask'])
             batch['image1']['warp']['img'].append(s['image1']['warp']['img'].unsqueeze(dim=0))
             batch['image1']['warp']['kpts'].append(s['image1']['warp']['kpts'])
             batch['image1']['warp']['kpts_map'].append(s['image1']['warp']['kpts_map'])
-            batch['image1']['warp']['mask'].append(s['image1']['warp']['mask'])
-            batch['image1']['homo'].append(s['image1']['homo'])
-        batch['index'] = torch.stack(batch['index']) 
-        batch['pairs'] = torch.stack(batch['pairs'])
+            batch['masks'].append(torch.stack((s['image']['warp']['mask'], s['image']['warp']['mask']), dim=0))
+#             batch['image1']['warp']['mask'].append(s['image1']['warp']['mask'])
+#             batch['image1']['homo'].append(s['image1']['homo'])
+        batch['masks'] = torch.stack(batch['masks'])
         for k0 in ('image','image1'):
-            batch[k0]['homo'] = torch.stack(batch[k0]['homo'])
+#             batch[k0]['homo'] = torch.stack(batch[k0]['homo'])
             for k1 in ('raw','warp'):
-                for k2 in sub_data['raw']:
+                for k2 in ('img', 'kpts_map'):
                     batch[k0][k1][k2] = torch.stack(batch[k0][k1][k2])
         return batch
     

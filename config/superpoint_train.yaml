@@ -1,5 +1,5 @@
 data:
-    name: 'coco'
+    name: 'self'
     resize: [240,320]
     image_train_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self/images'
     label_train_path: '/Users/zhouchang/Desktop/SuperPoint-Pytorch-master/data/self/keypoints'
