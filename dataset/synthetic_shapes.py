@@ -207,7 +207,7 @@ if __name__=="__main__":
     import matplotlib.pyplot as plt
 
     config_file = '../config/magic_point_syn_train.yaml'
-    device = 'cpu'#'cuda:3' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     with open(config_file, 'r') as fin:
         config = yaml.safe_load(fin)
 

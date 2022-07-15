@@ -36,8 +36,7 @@ class SelfDataset(torch.utils.data.Dataset):
         for im_path, lb_path, pair_path in zip(image_paths, label_paths, pair_paths):
             pairs = np.load(os.path.join(pair_path, 'pairs.npy'), allow_pickle=True)
             pairs = pairs.item()
-            templist = ['1377155868.png']
-            for key in templist:
+            for key in pairs:
                 filename = key.split(".")[0]
                 temp_im = os.path.join(im_path, key)
                 if lb_path is not None:
@@ -54,7 +53,8 @@ class SelfDataset(torch.utils.data.Dataset):
                         temp_lb1 = os.path.join(lb_path, filename+'.npy')
                     else:
                         temp_lb1 = None
-                    samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
+                    if len(index) >= 1500:
+                        samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
         return samples
 
     def __len__(self):
@@ -81,8 +81,8 @@ class SelfDataset(torch.utils.data.Dataset):
         pts1[:, 0] = (pts1[:, 0]+0.5)/1200*self.resize[0]
         pts1[:, 1] = (pts1[:, 1]+0.5)/1920*self.resize[1]
         
-        kpts_tensor = None if pts is None else torch.as_tensor(pts, device=self.device)
-        kpts_tensor1 = None if pts1 is None else torch.as_tensor(pts1, device=self.device)
+        kpts_tensor = None if pts is None else torch.as_tensor(pts, dtype=torch.float, device=self.device)
+        kpts_tensor1 = None if pts1 is None else torch.as_tensor(pts1, dtype=torch.float, device=self.device)
         
         # compute maps
         kpts_map = None if pts is None else compute_keypoint_map(kpts_tensor, img.shape, device=self.device, id_included=True)

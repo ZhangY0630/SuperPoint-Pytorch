@@ -1,3 +1,5 @@
+from calendar import c
+from matplotlib import image
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -111,26 +113,42 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
 
         image_mask = mask[idx][0]
         image1_mask = mask[idx][1]
-        valid_mask = torch.ones([imgKeyPointSize,img1KeyPointSize])
-        for n,(x,y) in enumerate(img):
-            if(image_mask[x][y]==0):
-                valid_mask[n,:]=0
-        for n,(x,y) in enumerate(img1): 
+        pairlens = len(pair[idx])
+        if pairlens==0:
+            print("no pairs")
+            continue
+        valid_mask = torch.ones([pairlens,pairlens]).to(device)
+        for ind, p in enumerate(pair[idx]):
+            x = img[p[0]][0]
+            y = img[p[0]][1]
+            if (image_mask[x][y]==0):
+                valid_mask[ind,:] = 0
+            x = img1[p[1]][0]
+            y = img1[p[1]][1]
             if(image1_mask[x][y]==0):
-                valid_mask[:,n]=0
+                valid_mask[:,ind]=0
+        # for n,(x,y) in enumerate(img):
+        #     if(image_mask[x][y]==0):
+        #         valid_mask[n,:]=0
+        # for n,(x,y) in enumerate(img1): 
+        #     if(image1_mask[x][y]==0):
+        #         valid_mask[:,n]=0
 
-        normalization = torch.sum(valid_mask)
+        normalization = torch.sum(valid_mask).to(device)
 
 
-        dot_product_desc = descriptorScore_singleBatch(img,img1,choosen_descriptor,choosen_descriptor1)
-        s = descriptorCorrespondence_singleBatch(imgKeyPointSize,img1KeyPointSize,pair[idx])
+        dot_product_desc = descriptorScore_singleBatch(img,img1,choosen_descriptor,choosen_descriptor1,pair[idx])
+        s = torch.eye(len(pair[idx]),device=device)
+        # s = descriptorCorrespondence_singleBatch(imgKeyPointSize,img1KeyPointSize,pair[idx],device)
         positive_dist = torch.maximum(torch.tensor(0.,device=device), positive_margin - dot_product_desc)
         negative_dist = torch.maximum(torch.tensor(0.,device=device), dot_product_desc - negative_margin)
-        loss = lambda_d * s * positive_dist + (1 - s) * negative_dist
+        loss = (lambda_d * s * positive_dist + (1 - s) * negative_dist).to(device)
 
         loss = lambda_loss*torch.sum(valid_mask * loss)/normalization
+
         total_loss = total_loss+loss
     return total_loss
+
 
 def precision_recall(pred, keypoint_map, valid_mask):
     pred = valid_mask * pred
@@ -202,7 +220,7 @@ def precision_recall(pred, keypoint_map, valid_mask):
 #     batch_descriptor = torch.reshape(batch_descriptor, [batch_size, -1, len(img_kpts), 1])
 #     print(batch_descriptor.shape)
 #---------------------------
-def descriptorScore_singleBatch(img,img1,descriptor,descriptor1):
+def descriptorScore_singleBatch(img,img1,descriptor,descriptor1,pair):
     """
     :param: img -> 2xN list 
     :param: img1 -> 2xM list
@@ -215,34 +233,48 @@ def descriptorScore_singleBatch(img,img1,descriptor,descriptor1):
     descriptor1 = descriptor1.reshape([H,W,descriptor_dim])
 
     descriptors = None
-    for x,y in img:
+    descriptors1 = None
+    for p in pair:
+        img_idx = p[0]
+        x = img[img_idx][0]
+        y = img[img_idx][1]
+    
         kpt = descriptor[x][y]
         if descriptors ==None:
             descriptors = kpt
         else:
             descriptors = torch.vstack((descriptors,kpt))
-    descriptors = descriptors.reshape([1,-1,len(img),1])
-    descriptors = F.normalize(descriptors, p=2, dim=1)
-    descriptors1 = None
-    for x,y in img1:
+            
+        
+        img_idx = p[1] 
+        x = img1[img_idx][0]
+        y = img1[img_idx][1]
         kpt1 = descriptor1[x][y]
         if descriptors1 ==None:
             descriptors1 = kpt1
         else:
             descriptors1 = torch.vstack((descriptors1,kpt1))
-    descriptors1 = descriptors1.reshape([1,-1,1,len(img1)])
+            
+            
+    descriptors = descriptors.reshape([1,-1,len(pair),1])
+    descriptors = F.normalize(descriptors, p=2, dim=1)
+    
+
+
+    descriptors1 = descriptors1.reshape([1,-1,1,len(pair)])
     descriptors1 = F.normalize(descriptors1, p=2, dim=1)
-    result = descriptors*descriptors1
-    dot_product_desc = torch.sum(result,dim=1).squeeze(0)
+
+    dot_product_desc = torch.sum(descriptors*descriptors1,dim=1).squeeze(0)
     dot_product_desc = F.relu(dot_product_desc)
+
     return dot_product_desc
-def descriptorCorrespondence_singleBatch(kptSize,kptSize1,pair):
+def descriptorCorrespondence_singleBatch(kptSize,kptSize1,pair,device='cpu'):
     """
     :param: kptSize -> int :image keypoints size
     :param: kptSize1 -> int : image1 keypoints size
     :param: pair -> [[2,5],[7,4],...] [N,2] : corresponding size
     """
-    corres = torch.sparse_coo_tensor(pair.t(),[1]*len(pair),(kptSize,kptSize1))
+    corres = torch.sparse_coo_tensor(pair.t(),torch.as_tensor([1]*len(pair), device = device),(len(pair),len(pair)), device = device)
     # corres = torch.sparse_coo_tensor(torch.tensor(pair).t(),[1]*len(pair),(kptSize,kptSize1))
     corres = corres.to_dense()
     return corres

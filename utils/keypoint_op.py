@@ -31,7 +31,8 @@ def compute_keypoint_map(points, shape, device='cpu', id_included = False):
     """
 
     if id_included:
-        points = torch.as_tensor((points.numpy()[:,:-1]).astype(np.float32), device=device)
+        # points = torch.as_tensor((points.cpu().numpy()[:,:-1]).astype(np.float32), device=device)
+        points = points[:,:-1]
     coord = torch.minimum(torch.round(points).type(torch.int), torch.tensor(shape,device=device)-1)
     kmap = torch.zeros((shape),dtype=torch.int, device=device)
     kmap[coord[:,0],coord[:,1]] = 1
@@ -46,8 +47,8 @@ def warp_points(points, homographies, device='cpu', id_included = False):
     """
     keys = None
     if id_included:
-        keys = torch.as_tensor((points.numpy()[:,2]).astype(np.float32), device=device)
-        points = torch.as_tensor((points.numpy()[:,:-1]).astype(np.float32), device=device)
+        keys = points[:,2]
+        points = points[:,:-1]
     if len(points)==0:
         return points
     #TODO: Part1, the following code maybe not appropriate for your code

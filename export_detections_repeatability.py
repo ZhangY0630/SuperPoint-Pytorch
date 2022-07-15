@@ -20,7 +20,7 @@ if __name__=="__main__":
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    device = 'cuda:2' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     if config['data']['name']=='synthetic':
         dataset_ = SyntheticShapes(config['data'], task='training', device=device)
     elif config['data']['name'] == 'hpatches':

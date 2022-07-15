@@ -15,6 +15,10 @@ from model.superpoint_bn import SuperPointBNNet
 from solver.loss import loss_func
 from solver.sfm_loss import loss_func_sfm
 
+
+import warnings
+warnings.filterwarnings("ignore",category=DeprecationWarning)
+
 #map magicleap weigt to our model
 model_dict_map= \
 {'conv3b.weight':'backbone.block3_2.0.weight',
@@ -140,8 +144,12 @@ def do_eval(model, dataloader, config, device):
             prob = raw_outputs
 
         # compute loss
-        loss = loss_func(config['solver'], data, prob, desc,
-                         prob_warp, desc_warp, device)
+        if config['data']['name']!='self':
+            loss = loss_func(config['solver'], data, prob, desc,
+                            prob_warp, desc_warp, device)
+        else:
+            loss = loss_func_sfm(config['solver'], data, prob, desc,
+                            prob_warp, desc_warp, device)
 
         mean_loss.append(loss.item())
     mean_loss = np.mean(mean_loss)
@@ -168,7 +176,7 @@ if __name__=='__main__':
     if not os.path.exists(config['solver']['save_dir']):
         os.makedirs(config['solver']['save_dir'])
 
-    device = 'cuda:2' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     ##Make Dataloader
     data_loaders = None
