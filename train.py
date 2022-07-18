@@ -140,14 +140,21 @@ def do_eval(model, dataloader, config, device):
         else:
             raw_outputs = model(data['image']['warp'])
 
-        if config['model']['name'] != 'magicpoint':
+                ## for superpoint
+        if config['model']['name']!='magicpoint' and config['data']['name']=='coco':#train superpoint
             warp_outputs = model(data['warp'])
             prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
-                                               raw_outputs['desc_info'], \
-                                               warp_outputs['det_info'], \
-                                               warp_outputs['desc_info']
+                                                raw_outputs['desc_info'], \
+                                                warp_outputs['det_info'],\
+                                                warp_outputs['desc_info']
+        elif config['model']['name']!='magicpoint' and config['data']['name']=='self':
+            warp_outputs = model(data['image1']['warp'])
+            prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
+                                                raw_outputs['desc_info'], \
+                                                warp_outputs['det_info'],\
+                                                warp_outputs['desc_info']
         else:
-            prob = raw_outputs
+                    prob = raw_outputs #train magicpoint
 
         # compute loss
         if config['data']['name']!='self':

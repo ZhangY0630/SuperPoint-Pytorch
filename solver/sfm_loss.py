@@ -41,7 +41,8 @@ def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,devic
                             validmask,
                             device)
         torch.cuda.empty_cache()
-        loss = det_loss + det_loss_warp #+ weighted_des_loss
+        # loss = det_loss + det_loss_warp #+ weighted_des_loss
+        loss = weighted_des_loss 
 
         a, b, c = det_loss.item(), det_loss_warp.item(), weighted_des_loss.item()
         print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b,c,a+b+c))
