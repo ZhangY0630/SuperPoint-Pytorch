@@ -12,6 +12,7 @@ def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,devic
                              data['image']['warp']['mask'], 
                              config['grid_size'],
                              device=device)
+        torch.cuda.empty_cache()
         if desc is None or prob_pair is None or desc_pair is None:
             return det_loss 
         
@@ -20,6 +21,7 @@ def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,devic
                             data['image1']['warp']['mask'],
                             config['grid_size'],
                             device=device)
+        torch.cuda.empty_cache()
 
 
         validmask = torch.stack((data['image']['warp']['mask'],data['image1']['warp']['mask']),dim=1)
@@ -38,7 +40,8 @@ def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,devic
                             pairs,
                             validmask,
                             device)
-        loss = det_loss + det_loss_warp + weighted_des_loss
+        torch.cuda.empty_cache()
+        loss = det_loss + det_loss_warp #+ weighted_des_loss
 
         a, b, c = det_loss.item(), det_loss_warp.item(), weighted_des_loss.item()
         print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b,c,a+b+c))
@@ -104,10 +107,10 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
     batch,_,H,W = descriptors.shape
     total_loss = 0
     for idx in range(batch):
-        img = img_kpts[idx]
-        imgKeyPointSize = len(img)
-        img1 = img1_kpts[idx]
-        img1KeyPointSize = len(img1)
+        # img = img_kpts[idx]
+        # imgKeyPointSize = len(img)
+        # img1 = img1_kpts[idx]
+        # img1KeyPointSize = len(img1)
         choosen_descriptor = descriptors[idx]
         choosen_descriptor1 = descriptors1[idx]
 
@@ -119,12 +122,12 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
             continue
         valid_mask = torch.ones([pairlens,pairlens]).to(device)
         for ind, p in enumerate(pair[idx]):
-            x = img[p[0]][0]
-            y = img[p[0]][1]
+            x = img_kpts[idx][p[0]][0]
+            y = img_kpts[idx][p[0]][1]
             if (image_mask[x][y]==0):
                 valid_mask[ind,:] = 0
-            x = img1[p[1]][0]
-            y = img1[p[1]][1]
+            x = img1_kpts[idx][p[1]][0]
+            y = img1_kpts[idx][p[1]][1]
             if(image1_mask[x][y]==0):
                 valid_mask[:,ind]=0
         # for n,(x,y) in enumerate(img):
@@ -137,7 +140,8 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
         normalization = torch.sum(valid_mask).to(device)
 
 
-        dot_product_desc = descriptorScore_singleBatch(img,img1,choosen_descriptor,choosen_descriptor1,pair[idx])
+        dot_product_desc = descriptorScore_singleBatch(img_kpts[idx],img1_kpts[idx],choosen_descriptor,choosen_descriptor1,pair[idx])
+        torch.cuda.empty_cache()
         s = torch.eye(len(pair[idx]),device=device)
         # s = descriptorCorrespondence_singleBatch(imgKeyPointSize,img1KeyPointSize,pair[idx],device)
         positive_dist = torch.maximum(torch.tensor(0.,device=device), positive_margin - dot_product_desc)

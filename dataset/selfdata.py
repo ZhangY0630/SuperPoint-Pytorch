@@ -53,8 +53,9 @@ class SelfDataset(torch.utils.data.Dataset):
                         temp_lb1 = os.path.join(lb_path, filename+'.npy')
                     else:
                         temp_lb1 = None
-                    if len(index) >= 1500:
+                    if len(index) >= 2650:
                         samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
+        print(f"Num of samples: {len(samples)}")
         return samples
 
     def __len__(self):
@@ -91,19 +92,19 @@ class SelfDataset(torch.utils.data.Dataset):
         valid_mask1 = torch.ones(img1.shape, device=self.device)
         
 
-        data = {    'image':{'raw':{'img': img_tensor,
-                                    'kpts': kpts_tensor,
-                                    'kpts_map':kpts_map,
-                                    'mask': valid_mask},
+        data = {    'image':{'raw':{'img': img_tensor.cpu(),
+                                    'kpts': kpts_tensor.cpu(),
+                                    'kpts_map':kpts_map.cpu(),
+                                    'mask': valid_mask.cpu()},
                             'warp':{'img': None,
                                     'kpts': None,
                                     'kpts_map':None,
                                     'mask': None},
                             'homo': torch.eye(3,device=self.device)},
-                    'image1':{'raw':{'img': img_tensor1,
-                                    'kpts': kpts_tensor1,
-                                    'kpts_map':kpts_map1,
-                                    'mask': valid_mask1},
+                    'image1':{'raw':{'img': img_tensor1.cpu(),
+                                    'kpts': kpts_tensor1.cpu(),
+                                    'kpts_map':kpts_map1.cpu(),
+                                    'mask': valid_mask1.cpu()},
                             'warp':{'img': None,
                                     'kpts': None,
                                     'kpts_map':None,
@@ -124,12 +125,12 @@ class SelfDataset(torch.utils.data.Dataset):
             homo_enable = self.config['augmentation']['homographic']['test_enable']
 
         if homo_enable and data['image']['raw']['kpts'] is not None and data['image1']['raw']['kpts'] is not None:#homographic augmentation
-            data_homo = homographic_aug_pipline(data['image']['warp']['img'],
-                                                data['image']['warp']['kpts'],
+            data_homo = homographic_aug_pipline(data['image']['warp']['img'].to(self.device),
+                                                data['image']['warp']['kpts'].to(self.device),
                                                 self.config['augmentation']['homographic'],
                                                 device=self.device, id_included=True)
-            data_homo1 = homographic_aug_pipline(data['image1']['warp']['img'],
-                                                data['image1']['warp']['kpts'],
+            data_homo1 = homographic_aug_pipline(data['image1']['warp']['img'].to(self.device),
+                                                data['image1']['warp']['kpts'].to(self.device),
                                                 self.config['augmentation']['homographic'],
                                                 device=self.device, id_included=True)
             data['image'].update(data_homo)

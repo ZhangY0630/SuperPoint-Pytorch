@@ -56,6 +56,7 @@ def train_eval(model, dataloader, config):
             model.train()
             mean_loss = []
             for i, data in tqdm(enumerate(dataloader['train'])):
+                torch.cuda.empty_cache()
                 prob, desc, prob_warp, desc_warp = None, None, None, None
                 if config['model']['name']=='magicpoint' and config['data']['name']=='coco':
                     data['raw'] = data['warp']
@@ -123,16 +124,21 @@ def train_eval(model, dataloader, config):
 def do_eval(model, dataloader, config, device):
     mean_loss = []
     truncate_n = max(int(0.1 * len(dataloader)), 100)  # 0.1 of test dataset for eval
-
+    
     for ind, data in tqdm(enumerate(dataloader)):
         if ind>truncate_n:
+            break
+        if ind > 20:
             break
         prob, desc, prob_warp, desc_warp = None, None, None, None
         if config['model']['name'] == 'magicpoint' and config['data']['name'] == 'coco':
             data['raw'] = data['warp']
             data['warp'] = None
 
-        raw_outputs = model(data['raw'])
+        if config['data']['name']!='self':
+            raw_outputs = model(data['raw'])
+        else:
+            raw_outputs = model(data['image']['warp'])
 
         if config['model']['name'] != 'magicpoint':
             warp_outputs = model(data['warp'])
@@ -209,7 +215,7 @@ if __name__=='__main__':
 
     ##Load Pretrained Model
     if os.path.exists(config['model']['pretrained_model']):
-        pre_model_dict = torch.load(config['model']['pretrained_model'])
+        pre_model_dict = torch.load(config['model']['pretrained_model'],map_location=torch.device("cuda:0"))
         model_dict = model.state_dict()
         for k,v in pre_model_dict.items():
             if k in model_dict.keys() and v.shape==model_dict[k].shape:
