@@ -7,45 +7,37 @@ from utils.keypoint_op import warp_points
 from utils.tensor_op import pixel_shuffle_inv
 
 def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,device='cpu',):
-        det_loss = detector_loss(data['image']['warp']['kpts_map'],
+        det_loss = detector_loss(data['image']['kpts_map'],
                              prob['logits'],
-                             data['image']['warp']['mask'], 
+                             data['image']['mask'], 
                              config['grid_size'],
                              device=device)
         torch.cuda.empty_cache()
         if desc is None or prob_pair is None or desc_pair is None:
             return det_loss 
         
-        det_loss_warp = detector_loss(data['image1']['warp']['kpts_map'],
+        det_loss1 = detector_loss(data['image1']['kpts_map'],
                             prob_pair['logits'],
-                            data['image1']['warp']['mask'],
+                            data['image1']['mask'],
                             config['grid_size'],
                             device=device)
         torch.cuda.empty_cache()
-
-
-        validmask = torch.stack((data['image']['warp']['mask'],data['image1']['warp']['mask']),dim=1)
-
-        # pairs = []
-        # for batch in range(len(data['index'])):
-        #     pairs.append( [pair for pair in zip(data['index'][batch],data['pair'][batch])])
-        pairs = data['pairs']
         
-        #descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask,device='cpu'):
+        validmask = torch.stack((data['image']['mask'],data['image1']['mask']),dim=1)   
+             
         weighted_des_loss = descriptor_loss(config,
-                            data['image']['warp']['kpts'],
-                            data['image1']['warp']['kpts'],
+                            data['image']['kpts'],
+                            data['image1']['kpts'],
                             desc['desc'],
                             desc_pair['desc'],
-                            pairs,
+                            data['pairs'],
                             validmask,
                             device)
         torch.cuda.empty_cache()
-        # loss = det_loss + det_loss_warp #+ weighted_des_loss
-        loss = weighted_des_loss 
-
-        a, b, c = det_loss.item(), det_loss_warp.item(), weighted_des_loss.item()
-        print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b,c,a+b+c))
+        loss = det_loss + det_loss1  + weighted_des_loss
+        a, b, c = det_loss.item(), det_loss1.item(), weighted_des_loss.item()
+        print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c,a+b+c))
+        torch.cuda.empty_cache()
         return loss
 
 
@@ -152,7 +144,7 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
         loss = lambda_loss*torch.sum(valid_mask * loss)/normalization
 
         total_loss = total_loss+loss
-    return total_loss
+    return total_loss/5
 
 
 def precision_recall(pred, keypoint_map, valid_mask):

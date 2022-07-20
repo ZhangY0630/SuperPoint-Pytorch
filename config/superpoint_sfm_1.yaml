@@ -64,7 +64,7 @@ solver:
         lambda_d: 0.05
         lambda_loss: 20000
     epoch: 100
-    base_lr: 0.0001 #0.0001
+    base_lr: 0.005 #0.0001
     train_batch_size: 8
     test_batch_size: 8
     save_dir: './export/'

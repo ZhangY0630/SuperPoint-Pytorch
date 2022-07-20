@@ -31,10 +31,10 @@ def loss_func(config, data, prob, desc=None, prob_warp=None, desc_warp=None, dev
                                data['warp']['mask'],
                                device)
 
-    loss = det_loss + det_loss_warp + weighted_des_loss
+    loss = det_loss + det_loss_warp # + weighted_des_loss
 
     a, b, c = det_loss.item(), det_loss_warp.item(), weighted_des_loss.item()
-    print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b,c,a+b+c))
+    print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c,a+b+c))
     return loss
 
 def detector_loss(keypoint_map, logits, valid_mask=None, grid_size=8, device='cpu'):

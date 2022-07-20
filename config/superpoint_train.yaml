@@ -1,19 +1,21 @@
 data:
-    name: 'self'
+    name: 'coco'
     resize: [240,320]
-    image_train_path: '/home/dev/self/train/images'
-    label_train_path: '/home/dev/self/train/keypoints'
-    image_test_path: '/home/dev/self/test/images'
-    label_test_path: '/home/dev/self/test/keypoints'
-    pairs_train_path: '/home/dev/self/train'
-    pairs_test_path: '/home/dev/self/test'
+    image_train_path: ['/home/dev/SuperPoint-Pytorch-origin/data/coco/images/train2017',]
+    label_train_path: ['/home/dev/SuperPoint-Pytorch-origin/data/coco/labels/train2017/',]
+    map_train_path: 
+    image_test_path: '/home/dev/SuperPoint-Pytorch-origin/data/coco/images/val2017/'
+    label_test_path: '/home/dev/SuperPoint-Pytorch-origin/data/coco/labels/val2017/'
+    map_test_path: 
+    pairs_train_path: 
+    pairs_test_path: 
     augmentation:
         photometric:
             train_enable: true
             test_enable: true
             primitives: [
                 'random_brightness', 'random_contrast', 'additive_speckle_noise',
-                'additive_gaussian_noise', 'additive_shade', 'motion_blur' ]
+                'additive_gaussian_noise', 'additive_shade', 'motion_blur']
             params:
                 random_brightness: {max_abs_change: 50}
                 random_contrast: {strength_range: [0.5, 1.5]}
@@ -64,7 +66,7 @@ solver:
         lambda_d: 0.05
         lambda_loss: 10000
     epoch: 10
-    base_lr: 0.0001 #0.0001
+    base_lr: 0.001 #0.0001
     train_batch_size: 8
     test_batch_size: 8
     save_dir: './export/'

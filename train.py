@@ -65,7 +65,12 @@ def train_eval(model, dataloader, config):
                 if config['data']['name']!='self':
                     raw_outputs = model(data['raw'])
                 else:
-                    raw_outputs = model(data['image']['warp'])
+                    # import cv2
+                    # input = data['image']['warp']['img'][0]
+                    # input = input.squeeze(0).cpu().numpy()*255
+                    # cv2.imwrite("1.jpg",input)
+                    # break
+                    raw_outputs = model(data['image'])
 
                 ## for superpoint
                 if config['model']['name']!='magicpoint' and config['data']['name']=='coco':#train superpoint
@@ -75,7 +80,7 @@ def train_eval(model, dataloader, config):
                                                        warp_outputs['det_info'],\
                                                        warp_outputs['desc_info']
                 elif config['model']['name']!='magicpoint' and config['data']['name']=='self':
-                    warp_outputs = model(data['image1']['warp'])
+                    warp_outputs = model(data['image1'])
                     prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
                                                        raw_outputs['desc_info'], \
                                                        warp_outputs['det_info'],\
@@ -90,7 +95,7 @@ def train_eval(model, dataloader, config):
                 else:
                     loss = loss_func_sfm(config['solver'], data, prob, desc,
                                  prob_warp, desc_warp, device)
-
+                
                 mean_loss.append(loss.item())
                 #reset
                 model.zero_grad()
@@ -117,6 +122,7 @@ def train_eval(model, dataloader, config):
                           .format(epoch, config['solver']['epoch'], i, len(dataloader['train']), eval_loss, save_path))
                     mean_loss = []
 
+            break
     except KeyboardInterrupt:
         torch.save(model.state_dict(), "./export/key_interrupt_model.pth")
 
@@ -124,7 +130,6 @@ def train_eval(model, dataloader, config):
 def do_eval(model, dataloader, config, device):
     mean_loss = []
     truncate_n = max(int(0.1 * len(dataloader)), 100)  # 0.1 of test dataset for eval
-    
     for ind, data in tqdm(enumerate(dataloader)):
         if ind>truncate_n:
             break
@@ -134,11 +139,17 @@ def do_eval(model, dataloader, config, device):
         if config['model']['name'] == 'magicpoint' and config['data']['name'] == 'coco':
             data['raw'] = data['warp']
             data['warp'] = None
-
         if config['data']['name']!='self':
             raw_outputs = model(data['raw'])
         else:
-            raw_outputs = model(data['image']['warp'])
+            # import matplotlib.pyplot as plt
+            # from PIL import Image
+            # input = data['image']['warp'][0]
+            # input = input.cpu().numpy
+            # im = Image.fromarray(input)
+            # im.show()
+            # break
+            raw_outputs = model(data['image'])
 
                 ## for superpoint
         if config['model']['name']!='magicpoint' and config['data']['name']=='coco':#train superpoint
@@ -148,7 +159,7 @@ def do_eval(model, dataloader, config, device):
                                                 warp_outputs['det_info'],\
                                                 warp_outputs['desc_info']
         elif config['model']['name']!='magicpoint' and config['data']['name']=='self':
-            warp_outputs = model(data['image1']['warp'])
+            warp_outputs = model(data['image1'])
             prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
                                                 raw_outputs['desc_info'], \
                                                 warp_outputs['det_info'],\

@@ -35,12 +35,19 @@ def homographic_aug_pipline(img, pts, config, device='cpu', id_included=False):
 
     warped_points_map = compute_keypoint_map(warped_points, img.shape[2:], device=device, id_included=id_included)
 
-    return {'warp':{'img': warped_image.squeeze(),
-                    'kpts': warped_points,
-                    'kpts_map': warped_points_map.squeeze(),#some point maybe filtered
-                    'mask':warped_valid_mask.squeeze()},
-            'homography':homography.squeeze(),
-            }
+    if id_included:
+        return {'img': warped_image.squeeze(),
+                'kpts': warped_points,
+                'kpts_map': warped_points_map.squeeze(),#some point maybe filtered
+                'mask':warped_valid_mask.squeeze()
+                }
+    else:
+        return {'warp':{'img': warped_image.squeeze(),
+                        'kpts': warped_points,
+                        'kpts_map': warped_points_map.squeeze(),#some point maybe filtered
+                        'mask':warped_valid_mask.squeeze()},
+                'homography':homography.squeeze(),
+                }
     #return warpped_image, warped_points, valid_mask, homography
 
 
