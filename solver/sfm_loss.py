@@ -34,7 +34,7 @@ def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,devic
                             validmask,
                             device)
         torch.cuda.empty_cache()
-        loss = det_loss + det_loss1  + weighted_des_loss
+        loss = det_loss + det_loss1 + weighted_des_loss
         a, b, c = det_loss.item(), det_loss1.item(), weighted_des_loss.item()
         print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c,a+b+c))
         torch.cuda.empty_cache()
@@ -140,11 +140,10 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
         positive_dist = torch.maximum(torch.tensor(0.,device=device), positive_margin - dot_product_desc)
         negative_dist = torch.maximum(torch.tensor(0.,device=device), dot_product_desc - negative_margin)
         loss = (lambda_d * s * positive_dist + (1 - s) * negative_dist).to(device)
-
         loss = lambda_loss*torch.sum(valid_mask * loss)/normalization
-
         total_loss = total_loss+loss
-    return total_loss/5
+    # total_loss = total_loss
+    return total_loss
 
 
 def precision_recall(pred, keypoint_map, valid_mask):
@@ -265,6 +264,7 @@ def descriptorScore_singleBatch(img,img1,descriptor,descriptor1,pair):
     dot_product_desc = F.relu(dot_product_desc)
 
     return dot_product_desc
+
 def descriptorCorrespondence_singleBatch(kptSize,kptSize1,pair,device='cpu'):
     """
     :param: kptSize -> int :image keypoints size

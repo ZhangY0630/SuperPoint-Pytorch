@@ -8,6 +8,7 @@ from utils.keypoint_op import compute_keypoint_map
 from dataset.utils.photometric_augmentation import *
 from torchvision import transforms
 from torch.utils.data import DataLoader
+import random
 class SelfDataset(torch.utils.data.Dataset):
 
     def __init__(self, config, is_train, device='cpu'):
@@ -36,7 +37,12 @@ class SelfDataset(torch.utils.data.Dataset):
         for im_path, lb_path, pair_path in zip(image_paths, label_paths, pair_paths):
             pairs = np.load(os.path.join(pair_path, 'pairs.npy'), allow_pickle=True)
             pairs = pairs.item()
-            for key in pairs:
+            for idx,key in enumerate(pairs):
+                
+                if "test" in label_paths[0]:
+                    if idx > 50:
+                        break
+                
                 keyname = key.split(".")[0]
                 temp_im = os.path.join(im_path, key)
                 if lb_path is not None:
@@ -53,10 +59,15 @@ class SelfDataset(torch.utils.data.Dataset):
                         temp_lb1 = os.path.join(lb_path, pairname+'.npy')
                     else:
                         temp_lb1 = None
-                    if len(index) <= 1500 and len(index) >= 1000:
-                        # samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
-                        samples.append({'image':temp_im1, 'label':temp_lb1, 'image1':temp_im, 'label1': temp_lb, 'index': covisibility, 'covisibility': index})
+                    # if len(index) <= 1500 and len(index) >= 1000:
+                    if len(index) >= 350:
+                        temp = list(zip(index, covisibility))  # make pairs out of the two lists
+                        temp = random.sample(temp, 350)  # pick 1000 random pairs
+                        index, covisibility = zip(*temp)  # separate the pairs
+                        samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
         print(f"Num of samples: {len(samples)}")
+        # num_of_pairs = len(samples[0]['index'])
+        # print("The first sample's number of matches: ", num_of_pairs)
         return samples
 
     def __len__(self):
