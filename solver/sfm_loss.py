@@ -109,10 +109,10 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
 
         image_mask = mask[idx][0]
         image1_mask = mask[idx][1]
-        pairlens = len(pair[idx])
-        if pairlens==0:
+        if pair[idx]==None:
             print("no pairs")
             continue
+        pairlens = len(pair[idx])
         valid_mask = torch.ones([pairlens,pairlens]).to(device)
         for ind, p in enumerate(pair[idx]):
             x = img_kpts[idx][p[0]][0]

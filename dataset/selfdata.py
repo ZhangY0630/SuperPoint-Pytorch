@@ -19,6 +19,7 @@ class SelfDataset(torch.utils.data.Dataset):
         self.resize = tuple(config['resize'])
         self.photo_augmentor = PhotoAugmentor(config['augmentation']['photometric'])
         self.config = config
+        # self.valid_index = []
         if self.is_train:
             self.samples = self._init_data(config['image_train_path'], config['label_train_path'], config['pairs_train_path'])
         else:
@@ -61,9 +62,9 @@ class SelfDataset(torch.utils.data.Dataset):
                         temp_lb1 = None
                     # if len(index) <= 1500 and len(index) >= 1000:
                     if len(index) >= 350:
-                        temp = list(zip(index, covisibility))  # make pairs out of the two lists
-                        temp = random.sample(temp, 350)  # pick 1000 random pairs
-                        index, covisibility = zip(*temp)  # separate the pairs
+                        # temp = list(zip(index, covisibility))  # make pairs out of the two lists
+                        # temp = random.sample(temp, 350)  # pick 350 random pairs
+                        # index, covisibility = zip(*temp)  # separate the pairs
                         samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
         print(f"Num of samples: {len(samples)}")
         # num_of_pairs = len(samples[0]['index'])
@@ -153,8 +154,12 @@ class SelfDataset(torch.utils.data.Dataset):
         for i in range(len(pairs_list)):
             if pairs_dict[pairs_list[i]] != -1 and index_dict[index_list[i]] != -1:
                 pairs.append([index_dict[index_list[i]], pairs_dict[pairs_list[i]]])
-        
-        data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.int), device=self.device)
+                
+        if len(pairs)>200:
+            pairs = random.sample(pairs, 200)
+            data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.int), device=self.device)
+        else:
+            data['pairs'] == None
         
         # remove the old index from points & normalize images
         for image_flag in ['image','image1']:
@@ -183,6 +188,7 @@ class SelfDataset(torch.utils.data.Dataset):
                'pairs': []
                }
         for s in samples:
+            
             batch['pairs'].append(s['pairs'])
             batch['image']['img'].append(s['image']['img'].unsqueeze(dim=0))
             batch['image']['kpts'].append(s['image']['kpts'])
