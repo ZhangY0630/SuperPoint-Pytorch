@@ -99,6 +99,7 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
 
     batch,_,H,W = descriptors.shape
     total_loss = 0
+    counter = batch
     for idx in range(batch):
         # img = img_kpts[idx]
         # imgKeyPointSize = len(img)
@@ -110,6 +111,7 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
         image_mask = mask[idx][0]
         image1_mask = mask[idx][1]
         if pair[idx]==None:
+            counter -= 1
             print("no pairs")
             continue
         pairlens = len(pair[idx])
@@ -142,7 +144,7 @@ def descriptor_loss(config,img_kpts,img1_kpts,descriptors,descriptors1,pair,mask
         loss = (lambda_d * s * positive_dist + (1 - s) * negative_dist).to(device)
         loss = lambda_loss*torch.sum(valid_mask * loss)/normalization
         total_loss = total_loss+loss
-    # total_loss = total_loss
+    total_loss = total_loss/counter if counter != 0 else torch.tensor(0.,device=device)
     return total_loss
 
 
