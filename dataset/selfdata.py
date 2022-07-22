@@ -61,7 +61,7 @@ class SelfDataset(torch.utils.data.Dataset):
                     else:
                         temp_lb1 = None
                     # if len(index) <= 1500 and len(index) >= 1000:
-                    if len(index) >= 350:
+                    if len(index) >= 400:
                         # temp = list(zip(index, covisibility))  # make pairs out of the two lists
                         # temp = random.sample(temp, 350)  # pick 350 random pairs
                         # index, covisibility = zip(*temp)  # separate the pairs
@@ -155,8 +155,8 @@ class SelfDataset(torch.utils.data.Dataset):
             if pairs_dict[pairs_list[i]] != -1 and index_dict[index_list[i]] != -1:
                 pairs.append([index_dict[index_list[i]], pairs_dict[pairs_list[i]]])
                 
-        if len(pairs)>200:
-            pairs = random.sample(pairs, 200)
+        if len(pairs)>=100:
+            pairs = random.sample(pairs, 100)
             data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.int), device=self.device)
         else:
             data['pairs'] == None
