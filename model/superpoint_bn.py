@@ -13,9 +13,9 @@ class SuperPointBNNet(torch.nn.Module):
         self.det_thresh = config['det_thresh']
         self.topk = config['topk']
         if using_bn:
-            self.backbone = VGGBackboneBN(config['backbone']['vgg'], input_channel, device=device)
+            self.backbone1 = VGGBackboneBN(config['backbone']['vgg'], input_channel, device=device)
         else:
-            self.backbone = VGGBackbone(config['backbone']['vgg'], input_channel, device=device)
+            self.backbone1 = VGGBackbone(config['backbone']['vgg'], input_channel, device=device)
         ##
         self.detector_head = DetectorHead(input_channel=config['det_head']['feat_in_dim'],
                                           grid_size=grid_size, using_bn=using_bn)
@@ -33,9 +33,9 @@ class SuperPointBNNet(torch.nn.Module):
           desc: Output descriptor pytorch tensor shaped N x 256 x H/8 x W/8.
         """
         if isinstance(x, dict):
-            feat_map = self.backbone(x['img'])
+            feat_map = self.backbone1(x['img'])
         else:
-            feat_map = self.backbone(x)
+            feat_map = self.backbone1(x)
         det_outputs = self.detector_head(feat_map)
 
         prob = det_outputs['prob']

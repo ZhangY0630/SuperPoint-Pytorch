@@ -4,11 +4,13 @@ import torch
 import torch.nn.functional as F
 from utils.keypoint_op import warp_points
 from utils.tensor_op import pixel_shuffle_inv
+import torch.nn as nn
+import logging
+import time
 
 
-
-def loss_func(config, data, prob, desc=None, prob_warp=None, desc_warp=None, device='cpu'):
-
+def loss_func(config, logfilename, data, prob, desc=None, prob_warp=None, desc_warp=None, device='cpu'):
+    logging.basicConfig(filename=logfilename, level=logging.INFO)
     det_loss = detector_loss(data['raw']['kpts_map'],
                              prob['logits'],
                              data['raw']['mask'],
@@ -25,16 +27,20 @@ def loss_func(config, data, prob, desc=None, prob_warp=None, desc_warp=None, dev
                                   device=device)
 
     weighted_des_loss = descriptor_loss(config,
-                               desc['desc_raw'],
-                               desc_warp['desc_raw'],
-                               data['homography'],
-                               data['warp']['mask'],
-                               device)
+                                desc['desc_raw'],
+                                desc_warp['desc_raw'],
+                                data['homography'],
+                                data['raw']['kpts_map'],
+                                data['warp']['kpts_map'],
+                                data['warp']['mask'],
+                                device)
 
-    loss = det_loss + det_loss_warp # + weighted_des_loss
+    loss = det_loss + det_loss_warp + weighted_des_loss
 
     a, b, c = det_loss.item(), det_loss_warp.item(), weighted_des_loss.item()
-    print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c,a+b+c))
+    # a, b = det_loss.item(), det_loss_warp.item()
+    print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c, a+b+c))
+    logging.info(str(time.ctime(time.time()))+' [INFO] {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c, a+b+c))
     return loss
 
 def detector_loss(keypoint_map, logits, valid_mask=None, grid_size=8, device='cpu'):
@@ -75,7 +81,7 @@ def detector_loss(keypoint_map, logits, valid_mask=None, grid_size=8, device='cp
     # loss = F.nll_loss(loss,labels)
     return loss
 
-def descriptor_loss(config, descriptors, warped_descriptors, homographies, valid_mask=None, device='cpu'):
+def descriptor_loss(config, descriptors, warped_descriptors, homographies,kpts_map,kpts_map1, valid_mask=None, device='cpu'):
     """
     :param descriptors: [B,C,H/8,W/8]
     :param warped_descriptors: [B,C.H/8,W/8]
@@ -110,6 +116,15 @@ def descriptor_loss(config, descriptors, warped_descriptors, homographies, valid
     warped_coord_cells = torch.reshape(warped_coord_cells, [batch_size, Hc, Wc, 1, 1, 2])
     cell_distances = torch.norm(coord_cells - warped_coord_cells, dim=-1, p=2)
     s = (cell_distances<=(grid_size-0.5)).float()#
+    
+    # m = nn.MaxPool2d(grid_size, stride=grid_size)
+    # kpt = m(kpts_map.float())
+    # kpt_r = kpt.reshape([batch_size,Hc,Wc,1,1])
+    # kpt1 = m(kpts_map1.float())
+    # kpt1_r = kpt1.reshape([batch_size,1,1,Hc,Wc])
+    # kpts_s = kpt_r*kpt1_r
+
+    
     # s[id_batch, h, w, h', w'] == 1 if the point of coordinates (h, w) warped by the
     # homography is at a distance from (h', w') less than config['grid_size']
     # and 0 otherwise
@@ -137,8 +152,8 @@ def descriptor_loss(config, descriptors, warped_descriptors, homographies, valid
     # descriptor at position (h, w) in the original descriptors map and the
     # descriptor at position (h', w') in the warped image
 
-    positive_dist = torch.maximum(torch.tensor(0.,device=device), positive_margin - dot_product_desc)
-    negative_dist = torch.maximum(torch.tensor(0.,device=device), dot_product_desc - negative_margin)
+    positive_dist = torch.maximum(torch.tensor(0.,device=device), positive_margin - dot_product_desc)#*kpts_s
+    negative_dist = torch.maximum(torch.tensor(0.,device=device), dot_product_desc - negative_margin)#*kpts_s
 
     loss = lambda_d * s * positive_dist + (1 - s) * negative_dist
 
@@ -147,10 +162,11 @@ def descriptor_loss(config, descriptors, warped_descriptors, homographies, valid
                              dtype=torch.float32, device=device) if valid_mask is None else valid_mask
     valid_mask = valid_mask.unsqueeze(dim=1).type(torch.float32)  # [B, H, W]->[B,1,H,W]
     valid_mask = pixel_shuffle_inv(valid_mask, grid_size)# ->[B,64,Hc,Wc]
-    valid_mask = torch.prod(valid_mask, dim=1)
+    valid_mask = torch.prod(valid_mask, dim=1)#*kpt1
     valid_mask = torch.reshape(valid_mask, [batch_size, 1, 1, Hc, Wc])
 
     normalization = torch.sum(valid_mask)*(Hc*Wc)
+    # normalization = torch.sum(kpt)*torch.sum(valid_mask)
 
     positive_sum = torch.sum(valid_mask*lambda_d*s*positive_dist) / normalization
     negative_sum = torch.sum(valid_mask*(1-s)*negative_dist) / normalization

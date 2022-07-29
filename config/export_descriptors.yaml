@@ -1,6 +1,6 @@
 data:
     name: 'hpatches'
-    data_dir: './data/hpatches'
+    data_dir: '/home/dev/SuperPoint-Pytorch-origin/hpatches-sequences-release'
     export_dir: './data/descriptors/hpatches/sp/'
     alteration: 'v'  # 'all' 'i' 'v'
     preprocessing:
@@ -24,7 +24,7 @@ model:
     name: 'superpoint'
     using_bn: true
     grid_size: 8
-    pretrained_model: './export/sp_0.pth'
+    pretrained_model: './export/selfdata_with_mg_labels_vp_90_1.772.pth'
     nms: 8
     det_thresh: 0.001 #0.001
     topk: 1000

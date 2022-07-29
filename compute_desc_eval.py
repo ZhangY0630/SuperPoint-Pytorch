@@ -30,7 +30,7 @@ experiments = ['./data/descriptors/hpatches/sp/']
 ##Homography estimation correctness
 for exp in experiments:
     orb = True if exp[:3] == 'orb' else False
-    correctness = ev.homography_estimation(exp, keep_k_points=1000, correctness_thresh=3, orb=orb)
+    correctness = ev.homography_estimation(exp, keep_k_points=1000, correctness_thresh=5, orb=orb)
     print('> {}: {}'.format(exp, correctness))
 
 

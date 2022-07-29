@@ -1,3 +1,4 @@
+#-*-coding:utf8-*-
 import torch
 from torch.optim.lr_scheduler import StepLR
 import numpy as np
@@ -6,14 +7,17 @@ import yaml
 import argparse
 from tqdm import tqdm
 from dataset.coco import COCODataset
+from dataset.selfdata import SelfDataset
 from dataset.synthetic_shapes import SyntheticShapes
 from torch.utils.data import DataLoader
 from model.magic_point import MagicPoint
 from model.superpoint_bn import SuperPointBNNet
-from solver.loss import loss_func
+from solver.sfm_loss import loss_func_sfm
+from model.superpoint import SuperPointNet
+from model.sp_bn_combine import SuperPointModified
+import warnings
 import logging
 import time
-import warnings
 warnings.filterwarnings("ignore",category=DeprecationWarning)
 
 #map magicleap weigt to our model
@@ -55,26 +59,16 @@ def train_eval(model, dataloader, config, logfilename):
             for i, data in tqdm(enumerate(dataloader['train'])):
                 torch.cuda.empty_cache()
                 prob, desc, prob_warp, desc_warp = None, None, None, None
-                if config['model']['name']=='magicpoint' and config['data']['name']=='coco':
-                    data['raw'] = data['warp']
-                    data['warp'] = None
 
-                raw_outputs = model(data['raw'])
-                
-                ## for superpoint
-                if config['model']['name']!='magicpoint' and config['data']['name']=='coco':#train superpoint
-                    warp_outputs = model(data['warp'])
-                    prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
-                                                       raw_outputs['desc_info'], \
-                                                       warp_outputs['det_info'],\
-                                                       warp_outputs['desc_info']
-                else:
-                    prob = raw_outputs #train magicpoint
+                raw_outputs = model(data['image'])
+                warp_outputs = model(data['image1'])
+                prob, desc, prob_warp, desc_warp =  raw_outputs['det_info'], \
+                                                    raw_outputs['desc_info'], \
+                                                    warp_outputs['det_info'], \
+                                                    warp_outputs['desc_info']
 
                 ##loss
-                loss = loss_func(config['solver'], logfilename, data, prob, desc,
-                                 prob_warp, desc_warp, device)
-                
+                loss = loss_func_sfm(config['solver'], logfilename, data, prob, desc, prob_warp, desc_warp, device)
                 
                 mean_loss.append(loss.item())
                 #reset
@@ -88,7 +82,6 @@ def train_eval(model, dataloader, config, logfilename):
                                   optimizer.state_dict()['param_groups'][0]['lr'], np.mean(mean_loss)))
                     logging.info(str(time.ctime(time.time()))+' [INFO] Epoch [{}/{}], Step [{}/{}], LR [{}], Loss: {:.3f}'.format(epoch, config['solver']['epoch'], i, len(dataloader['train']),
                                   optimizer.state_dict()['param_groups'][0]['lr'], np.mean(mean_loss)))
-                    
                     mean_loss = []
 
                 ##do evaluation
@@ -108,7 +101,7 @@ def train_eval(model, dataloader, config, logfilename):
                     
                     mean_loss = []
 
-            break
+            # break
     except KeyboardInterrupt:
         logging.info(str(time.ctime(time.time()))+' [INFO] KeyboardInterrupt! Model saved to ./export/key_interrupt_model.pth')
         torch.save(model.state_dict(), "./export/key_interrupt_model.pth")
@@ -123,39 +116,27 @@ def do_eval(model, dataloader, config, device):
         if ind > 20:
             break
         prob, desc, prob_warp, desc_warp = None, None, None, None
-        if config['model']['name'] == 'magicpoint' and config['data']['name'] == 'coco':
-            data['raw'] = data['warp']
-            data['warp'] = None
-        raw_outputs = model(data['raw'])
+        raw_outputs = model(data['image'])
 
-                ## for superpoint
-        if config['model']['name']!='magicpoint' and config['data']['name']=='coco':#train superpoint
-            warp_outputs = model(data['warp'])
-            prob, desc, prob_warp, desc_warp = raw_outputs['det_info'], \
-                                                raw_outputs['desc_info'], \
-                                                warp_outputs['det_info'],\
-                                                warp_outputs['desc_info']
-        else:
-                    prob = raw_outputs #train magicpoint
-
+        warp_outputs = model(data['image1'])
+        prob, desc, prob_warp, desc_warp =  raw_outputs['det_info'], \
+                                            raw_outputs['desc_info'], \
+                                            warp_outputs['det_info'], \
+                                            warp_outputs['desc_info']
         # compute loss
-        loss = loss_func(config['solver'], logfilename, data, prob, desc,
-                            prob_warp, desc_warp, device)
-        
+        loss = loss_func_sfm(config['solver'], logfilename, data, prob, desc, prob_warp, desc_warp, device)
 
         mean_loss.append(loss.item())
     mean_loss = np.mean(mean_loss)
 
     return mean_loss
 
-
-
 if __name__=='__main__':
 
     torch.multiprocessing.set_start_method('spawn')
     logfilename = "./log/{time}.log".format(time=str(time.ctime(time.time())).replace(' ', '_'))
     logging.basicConfig(filename=logfilename, level=logging.INFO)
-    logging.info(str(time.ctime(time.time()))+' [INFO] train.py is running!')
+    logging.info(str(time.ctime(time.time()))+' [INFO] train_sfm.py is running!')
     parser = argparse.ArgumentParser()
     parser.add_argument("config")
 
@@ -174,26 +155,15 @@ if __name__=='__main__':
 
     ##Make Dataloader
     data_loaders = None
-    if config['data']['name'] == 'coco':
-        datasets = {k: COCODataset(config['data'], is_train=True if k == 'train' else False, device=device)
+    datasets = {k: SelfDataset(config['data'], is_train=True if k == 'train' else False, device=device)
                     for k in ['test', 'train']}
-        data_loaders = {k: DataLoader(datasets[k],
+    data_loaders = {k: DataLoader(datasets[k],
                                       config['solver']['{}_batch_size'.format(k)],
                                       collate_fn=datasets[k].batch_collator,
                                       shuffle=True) for k in ['train', 'test']}
-    elif config['data']['name'] == 'synthetic':
-        datasets = {'train': SyntheticShapes(config['data'], task=['training', 'validation'], device=device),
-                    'test': SyntheticShapes(config['data'], task=['test', ], device=device)}
-        data_loaders = {'train': DataLoader(datasets['train'], batch_size=config['solver']['train_batch_size'], shuffle=True,
-                                            collate_fn=datasets['train'].batch_collator),
-                        'test': DataLoader(datasets['test'], batch_size=config['solver']['test_batch_size'], shuffle=True,
-                                           collate_fn=datasets['test'].batch_collator)}
     logging.info(str(time.ctime(time.time()))+' [INFO] Data Loaded')
     ##Make model
-    if config['model']['name'] == 'superpoint':
-        model = SuperPointBNNet(config['model'], device=device, using_bn=config['model']['using_bn'])
-    elif config['model']['name'] == 'magicpoint':
-        model = MagicPoint(config['model'], device=device)
+    model = SuperPointModified(config['model'], device=device, using_bn=config['model']['using_bn'])
     logging.info(str(time.ctime(time.time()))+' [INFO] Model Created')
     ##Load Pretrained Model
     if os.path.exists(config['model']['pretrained_model']):
@@ -203,8 +173,8 @@ if __name__=='__main__':
             if k in model_dict.keys() and v.shape==model_dict[k].shape:
                 model_dict[k] = v
         model.load_state_dict(model_dict)
+        print('model loaded!')
         logging.info(str(time.ctime(time.time()))+' [INFO] Pretrained Model: {model_name} Loaded'.format(model_name=config['model']['pretrained_model']))
-    
     model.to(device)
     train_eval(model, data_loaders, config, logfilename)
     print('Done')

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_imgs(imgs, titles=None, cmap='brg', ylabel='', normalize=False, ax=None, dpi=100):
+def plot_imgs(imgs, titles=None, cmap='brg', ylabel='', normalize=False, ax=None, dpi=100, save=None):
     n = len(imgs)
     if not isinstance(cmap, list):
         cmap = [cmap]*n
@@ -29,6 +29,8 @@ def plot_imgs(imgs, titles=None, cmap='brg', ylabel='', normalize=False, ax=None
     ax[0].set_ylabel(ylabel)
     plt.tight_layout()
     plt.show()
+    if save != None:
+        plt.savefig(save)
 
 
 

@@ -19,23 +19,22 @@ class SelfDataset(torch.utils.data.Dataset):
         self.resize = tuple(config['resize'])
         self.photo_augmentor = PhotoAugmentor(config['augmentation']['photometric'])
         self.config = config
-        # self.valid_index = []
         if self.is_train:
-            self.samples = self._init_data(config['image_train_path'], config['label_train_path'], config['pairs_train_path'])
+            self.samples = self._init_data(config['image_train_path'], config['label_train_path'], config['pairs_train_path'], config['mask_train_path'])
         else:
-            self.samples = self._init_data(config['image_test_path'], config['label_test_path'], config['pairs_test_path'])
+            self.samples = self._init_data(config['image_test_path'], config['label_test_path'], config['pairs_test_path'], config['mask_test_path'])
 
 
-    def _init_data(self, image_path, label_path=None, pair_path=None):
+    def _init_data(self, image_path, label_path=None, pair_path=None, mask_path=None):
         ##
         if not isinstance(image_path,list):
-            image_paths, label_paths, pair_paths = [image_path,], [label_path,], [pair_path,]
+            image_paths, label_paths, pair_paths, mask_paths = [image_path,], [label_path,], [pair_path,], [mask_path]
         else:
-            image_paths, label_paths, pair_paths = image_path, label_path, pair_path
+            image_paths, label_paths, pair_paths = image_path, label_path, pair_path, mask_path
 
         image_types = ['jpg','jpeg','bmp','png']
         samples = []
-        for im_path, lb_path, pair_path in zip(image_paths, label_paths, pair_paths):
+        for im_path, lb_path, pair_path, mask_path in zip(image_paths, label_paths, pair_paths, mask_paths):
             pairs = np.load(os.path.join(pair_path, 'pairs.npy'), allow_pickle=True)
             pairs = pairs.item()
             for idx,key in enumerate(pairs):
@@ -46,29 +45,30 @@ class SelfDataset(torch.utils.data.Dataset):
                 
                 keyname = key.split(".")[0]
                 temp_im = os.path.join(im_path, key)
-                if lb_path is not None:
-                    temp_lb = os.path.join(lb_path, keyname+'.npy')
+                temp_lb = os.path.join(lb_path, keyname+'.npy')
+                if mask_path is not None:
+                    temp_ma = os.path.join(mask_path, keyname+'.npy')
                 else:
-                    temp_lb = None
+                    temp_ma = None
+                    
                 for i in range(len(pairs[key]['pairs'])):
                     pair = pairs[key]['pairs'][i]
                     pairname = pair.split(".")[0]
                     covisibility = pairs[key]['covisibility'][i]
                     index = pairs[key]['index'][i]
                     temp_im1 = os.path.join(im_path, pair)
-                    if lb_path is not None:
-                        temp_lb1 = os.path.join(lb_path, pairname+'.npy')
+                    temp_lb1 = os.path.join(lb_path, pairname+'.npy')
+                    if mask_path is not None:
+                        temp_ma1 = os.path.join(mask_path, pairname+'.npy')
                     else:
-                        temp_lb1 = None
-                    # if len(index) <= 1500 and len(index) >= 1000:
+                        temp_ma1 = None
+                        
                     if len(index) >= 400:
-                        # temp = list(zip(index, covisibility))  # make pairs out of the two lists
-                        # temp = random.sample(temp, 350)  # pick 350 random pairs
-                        # index, covisibility = zip(*temp)  # separate the pairs
-                        samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
+                        if temp_ma == None:
+                            samples.append({'image':temp_im, 'label':temp_lb, 'image1':temp_im1, 'label1': temp_lb1, 'index': index, 'covisibility': covisibility})
+                        else:
+                            samples.append({'image':temp_im, 'label':temp_lb, 'mask':temp_ma, 'image1':temp_im1, 'label1': temp_lb1, 'mask1':temp_ma1, 'index': index, 'covisibility': covisibility})
         print(f"Num of samples: {len(samples)}")
-        # num_of_pairs = len(samples[0]['index'])
-        # print("The first sample's number of matches: ", num_of_pairs)
         return samples
 
     def __len__(self):
@@ -155,13 +155,8 @@ class SelfDataset(torch.utils.data.Dataset):
             if pairs_dict[pairs_list[i]] != -1 and index_dict[index_list[i]] != -1:
                 pairs.append([index_dict[index_list[i]], pairs_dict[pairs_list[i]]])
                 
-        if len(pairs)>=100:
-            pairs = random.sample(pairs, 100)
-            data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.int), device=self.device)
-        else:
-            data['pairs'] == None
+        data['pairs'] = torch.as_tensor(np.array(pairs).astype(np.int), device=self.device)        
         
-        # remove the old index from points & normalize images
         for image_flag in ['image','image1']:
             data[image_flag]['kpts'] = data[image_flag]['kpts'][:,:2].int()
             data[image_flag]['img'] = data[image_flag]['img']/255.

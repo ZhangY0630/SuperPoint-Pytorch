@@ -5,8 +5,11 @@ import torch
 import torch.nn.functional as F
 from utils.keypoint_op import warp_points
 from utils.tensor_op import pixel_shuffle_inv
+import logging
+import time
 
-def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,device='cpu',):
+def loss_func_sfm(config,logfilename,data,prob,desc=None,prob_pair=None,desc_pair=None,device='cpu',):
+        logging.basicConfig(filename=logfilename, level=logging.INFO)
         det_loss = detector_loss(data['image']['kpts_map'],
                              prob['logits'],
                              data['image']['mask'], 
@@ -33,10 +36,14 @@ def loss_func_sfm(config,data,prob,desc=None,prob_pair=None,desc_pair=None,devic
                             data['pairs'],
                             validmask,
                             device)
+        
         torch.cuda.empty_cache()
         loss = det_loss + det_loss1 + weighted_des_loss
+        # a, b = det_loss.item(), det_loss1.item()
+        # print('debug: {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b))
         a, b, c = det_loss.item(), det_loss1.item(), weighted_des_loss.item()
         print('debug: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c,a+b+c))
+        logging.info(str(time.ctime(time.time()))+' [INFO] {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}'.format(a, b, a+b, c, a+b+c))
         torch.cuda.empty_cache()
         return loss
 
